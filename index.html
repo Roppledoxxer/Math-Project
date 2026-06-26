@@ -1,0 +1,1568 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Circle Defense</title>
+<style>
+*{
+    box-sizing:border-box;
+    margin:0;
+    padding:0;
+    font-family:Arial,Helvetica,sans-serif;
+}
+
+:root{
+    --panel: rgba(0,0,0,.45);
+    --panel-strong: rgba(7, 12, 30, .88);
+    --blue: #1da1f2;
+    --gold: #ffb347;
+    --danger: #ff4a4a;
+}
+
+body{
+    overflow:hidden;
+    background:radial-gradient(circle at top,#12234b,#050814 72%);
+    color:white;
+}
+
+#gameContainer{
+    width:100vw;
+    height:100vh;
+    position:relative;
+    overflow:hidden;
+}
+
+#stars{
+    position:absolute;
+    inset:0;
+    overflow:hidden;
+    opacity:.95;
+    pointer-events:none;
+}
+
+#hud{
+    position:absolute;
+    top:10px;
+    left:10px;
+    z-index:100;
+    display:flex;
+    gap:12px;
+    flex-wrap:wrap;
+    opacity:0;
+    transform:translateY(-12px);
+    transition:opacity .5s ease, transform .5s ease;
+}
+
+#hud.visible{
+    opacity:1;
+    transform:translateY(0);
+}
+
+.panel{
+    background:var(--panel);
+    backdrop-filter:blur(6px);
+    padding:10px 14px;
+    border-radius:12px;
+    border:1px solid rgba(255,255,255,.15);
+}
+
+#helpBtn,
+#experimentalBtn,
+#modeBtn{
+    cursor:pointer;
+    user-select:none;
+}
+
+#experimentalBtn:hover,
+#helpBtn:hover{
+    background:rgba(255,255,255,.12);
+}
+
+#helpPanel{
+    position:absolute;
+    right:10px;
+    top:10px;
+    width:320px;
+    background:rgba(0,0,0,.84);
+    border-radius:12px;
+    padding:15px;
+    z-index:150;
+    display:none;
+    max-height:90vh;
+    overflow:auto;
+}
+
+#helpPanel h3{
+    margin:10px 0 8px;
+    color:#6ad6ff;
+}
+
+#helpPanel ul{
+    margin-left:18px;
+    line-height:1.5;
+}
+
+#earth{
+    position:absolute;
+    bottom:-130px;
+    left:50%;
+    transform:translateX(-50%) scale(1);
+    width:420px;
+    height:420px;
+    border-radius:50%;
+    background:
+      radial-gradient(circle at 40% 35%,
+        #a6f0ff 0%,
+        #2d8fe3 35%,
+        #1352a0 70%,
+        #0b2a55 100%);
+    box-shadow:
+      0 0 60px rgba(100,200,255,.55),
+      inset -30px -30px 60px rgba(0,0,0,.45);
+    animation:earthFloat 6s ease-in-out infinite;
+    transition:transform .3s ease;
+}
+
+#earth::before{
+    content:"";
+    position:absolute;
+    inset:-25px;
+    border-radius:50%;
+    background:radial-gradient(circle,
+        rgba(120,220,255,.35),
+        rgba(0,0,0,0) 70%);
+    filter:blur(2px);
+    z-index:-1;
+}
+
+#earth::after{
+    content:"";
+    position:absolute;
+    inset:0;
+    border-radius:50%;
+    background:
+        radial-gradient(circle at 15% 30%, #2ecc71 0 14%, transparent 15%),
+        radial-gradient(circle at 19% 55%, #27ae60 0 15%, transparent 12%),
+        radial-gradient(circle at 65% 35%, #32cd32 0 15%, transparent 16%),
+        radial-gradient(circle at 90% 30%, #28b463 0 17%, transparent 18%),
+        radial-gradient(circle at 85% 65%, #2ecc71 0 9%, transparent 10%);
+    opacity:0.95;
+    mix-blend-mode:normal;
+}
+
+.earth-hit{
+    animation:earthHit .35s ease;
+}
+
+.asteroid{
+    position:absolute;
+    width:min(90vw,460px);
+    background:rgba(35,35,35,.95);
+    border:2px solid #8d8d8d;
+    border-radius:18px;
+    padding:12px;
+    color:white;
+    box-shadow:0 0 20px rgba(255,255,255,.15);
+    transform-origin:center;
+    animation:asteroidDrift 3s ease-in-out infinite;
+    transition:transform .18s ease, box-shadow .18s ease, border-color .18s ease, background .18s ease;
+}
+
+.asteroid.warning{
+    border-color:var(--danger);
+    background:#7c0000;
+    box-shadow:0 0 24px rgba(255,0,0,.65);
+    animation:warningPulse .8s ease-in-out infinite;
+}
+
+.question{
+    font-weight:bold;
+    margin-bottom:10px;
+    line-height:1.35;
+}
+
+.answers{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:8px;
+}
+
+.answerBtn{
+    padding:10px;
+    border:none;
+    border-radius:10px;
+    background:#2a4778;
+    color:white;
+    cursor:pointer;
+    transition:.2s;
+    font-size:15px;
+}
+
+.answerBtn:hover{
+    background:#3d68a8;
+    transform:translateY(-1px);
+}
+
+.answerBtn:active{
+    transform:scale(.96);
+}
+
+#message{
+    position:absolute;
+    top:70px;
+    left:50%;
+    transform:translateX(-50%);
+    font-size:24px;
+    font-weight:bold;
+    color:#ff6a6a;
+    text-shadow:0 0 10px darkred;
+    z-index:200;
+    opacity:0;
+    transition:opacity .2s ease, transform .2s ease;
+    pointer-events:none;
+}
+
+#message.show{
+    opacity:1;
+    transform:translateX(-50%) translateY(0);
+}
+
+#gameOver,
+#menuOverlay{
+    position:absolute;
+    inset:0;
+    display:none;
+    justify-content:center;
+    align-items:center;
+    z-index:500;
+}
+
+#menuOverlay{
+    display:flex;
+    background:rgba(0,0,0,.25);
+}
+
+.overlayBackdrop{
+    position:absolute;
+    inset:0;
+    background:radial-gradient(circle at center, rgba(10,18,38,.12), rgba(0,0,0,.55));
+    backdrop-filter: blur(2px);
+}
+
+#menuCard,
+#gameOverCard{
+    position:relative;
+    z-index:2;
+    width:min(92vw,700px);
+    background:var(--panel-strong);
+    padding:28px;
+    border-radius:22px;
+    border:1px solid rgba(255,255,255,.12);
+    box-shadow:0 20px 60px rgba(0,0,0,.5);
+    text-align:center;
+}
+
+#menuCard{
+    transform:translateY(0);
+    opacity:1;
+}
+
+#menuCard.fadeUp{
+    animation:menuFadeUp .6s ease forwards;
+}
+
+#menuTitle{
+    font-size:clamp(2rem, 5vw, 3.5rem);
+    margin-bottom:8px;
+    color:#ffffff;
+    text-shadow:0 0 18px rgba(109,214,255,.35);
+}
+
+#menuSubtitle{
+    color:#c6d8ff;
+    margin-bottom:18px;
+    line-height:1.5;
+}
+
+.menuEarthWrap{
+    position:relative;
+    height:230px;
+    margin:6px auto 12px;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+}
+
+.menuEarth{
+    position:relative;
+    width:210px;
+    height:210px;
+    border-radius:50%;
+    background:
+      radial-gradient(circle at 40% 35%,
+        #a6f0ff 0%,
+        #2d8fe3 36%,
+        #1352a0 72%,
+        #0b2a55 100%);
+    box-shadow:0 0 50px rgba(100,200,255,.55), inset -18px -18px 40px rgba(0,0,0,.45);
+    animation:menuEarthSpin 10s linear infinite;
+}
+
+.menuEarth::before{
+    content:"";
+    position:absolute;
+    inset:-16px;
+    border-radius:50%;
+    background:radial-gradient(circle, rgba(120,220,255,.35), rgba(0,0,0,0) 68%);
+    filter:blur(1px);
+}
+
+.menuEarth::after{
+    content:"";
+    position:absolute;
+    inset:0;
+    border-radius:50%;
+    background:
+        radial-gradient(circle at 18% 30%, #2ecc71 0 14%, transparent 15%),
+        radial-gradient(circle at 25% 60%, #27ae60 0 12%, transparent 13%),
+        radial-gradient(circle at 58% 35%, #32cd32 0 14%, transparent 15%),
+        radial-gradient(circle at 80% 24%, #28b463 0 12%, transparent 13%),
+        radial-gradient(circle at 85% 65%, #2ecc71 0 8%, transparent 9%);
+}
+
+.menuButtons{
+    display:flex;
+    justify-content:center;
+    gap:12px;
+    flex-wrap:wrap;
+    margin-top:16px;
+}
+
+.menuButton,
+.restart,
+.menuSmall{
+    border:none;
+    border-radius:14px;
+    cursor:pointer;
+    transition:.2s ease;
+    color:white;
+    font-size:16px;
+}
+
+.menuButton,
+.restart{
+    padding:13px 22px;
+    background:linear-gradient(135deg, #1da1f2, #116cd1);
+    box-shadow:0 10px 24px rgba(0,0,0,.25);
+}
+
+.menuButton:hover,
+.restart:hover,
+.menuSmall:hover{
+    transform:translateY(-2px) scale(1.01);
+}
+
+.menuSmall{
+    padding:13px 18px;
+    background:rgba(255,255,255,.08);
+    border:1px solid rgba(255,255,255,.12);
+}
+
+.modeLabel{
+    margin-top:12px;
+    font-size:15px;
+    color:#b9d2ff;
+}
+
+.modePill{
+    display:inline-block;
+    margin-left:6px;
+    padding:4px 10px;
+    border-radius:999px;
+    background:rgba(255,255,255,.1);
+    border:1px solid rgba(255,255,255,.12);
+}
+
+#gameOver{
+    background:rgba(0,0,0,.72);
+}
+
+#gameOverCard h1{
+    margin-bottom:10px;
+    color:#ffb347;
+    font-size:clamp(2rem, 5vw, 3.1rem);
+}
+
+.gameOverGlow{
+    width:100%;
+    height:2px;
+    background:linear-gradient(90deg, transparent, rgba(255,179,71,.85), transparent);
+    margin:12px 0 18px;
+}
+
+.statGrid{
+    display:grid;
+    grid-template-columns:repeat(2, minmax(0, 1fr));
+    gap:10px;
+    text-align:left;
+    margin-top:14px;
+}
+
+.stat{
+    padding:12px 14px;
+    border-radius:12px;
+    background:rgba(255,255,255,.06);
+    border:1px solid rgba(255,255,255,.08);
+}
+
+.stat b{
+    display:block;
+    margin-bottom:3px;
+    color:#d9e8ff;
+    font-size:13px;
+    font-weight:600;
+    letter-spacing:.02em;
+}
+
+.stat span{
+    font-size:18px;
+}
+
+.gameOverButtons{
+    display:flex;
+    justify-content:center;
+    gap:12px;
+    flex-wrap:wrap;
+    margin-top:18px;
+}
+
+.timerRing{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    min-width:46px;
+    padding:0 10px;
+    border-radius:999px;
+    background:rgba(255,255,255,.08);
+    border:1px solid rgba(255,255,255,.12);
+}
+
+.timerDanger{
+    color:#ff8b8b;
+}
+
+.explosionParticle{
+    position:absolute;
+    width:8px;
+    height:8px;
+    border-radius:50%;
+    pointer-events:none;
+    z-index:9999;
+}
+
+@keyframes asteroidDrift{
+    0%,100%{ transform:translateY(0) rotate(-.5deg); }
+    50%{ transform:translateY(-8px) rotate(.5deg); }
+}
+
+@keyframes warningPulse{
+    0%,100%{ transform:translateY(0) scale(1); }
+    50%{ transform:translateY(-4px) scale(1.015); }
+}
+
+@keyframes menuEarthSpin{
+    from{ transform:rotate(0deg); }
+    to{ transform:rotate(360deg); }
+}
+
+@keyframes earthFloat{
+    0%,100%{ transform:translateX(-50%) translateY(0) scale(1); }
+    50%{ transform:translateX(-50%) translateY(-8px) scale(1.01); }
+}
+
+@keyframes earthHit{
+    0%{ transform:translateX(-50%) scale(1); }
+    30%{ transform:translateX(-50%) scale(1.04); }
+    60%{ transform:translateX(-50%) scale(.98); }
+    100%{ transform:translateX(-50%) scale(1); }
+}
+
+@keyframes menuFadeUp{
+    0%{ opacity:1; transform:translateY(0); }
+    100%{ opacity:0; transform:translateY(-26px); }
+}
+
+@keyframes overlayEnter{
+    from{ opacity:0; transform:translateY(22px) scale(.98); }
+    to{ opacity:1; transform:translateY(0) scale(1); }
+}
+
+.overlayEnter{
+    animation:overlayEnter .5s ease both;
+}
+
+@media(max-width:700px){
+    .answers{
+        grid-template-columns:1fr;
+    }
+
+    #helpPanel{
+        width:92vw;
+        left:4vw;
+        right:auto;
+    }
+
+    .asteroid{
+        width:92vw;
+    }
+
+    .statGrid{
+        grid-template-columns:1fr;
+    }
+}
+</style>
+</head>
+<body>
+<div id="gameContainer">
+    <div id="stars"></div>
+
+    <div id="hud">
+        <div class="panel">Score: <span id="score">0</span></div>
+        <div class="panel">Lives: <span id="lives">3</span></div>
+        <div class="panel">Level: <span id="level">1</span></div>
+        <div class="panel">Combo: x<span id="combo">1</span></div>
+        <div class="panel">Mode: <span id="modeDisplay">Classic</span></div>
+        <div class="panel" id="timerPanel" style="display:none;">Time: <span class="timerRing" id="timer">60</span></div>
+        <div class="panel" id="helpBtn">📘 Formulas</div>
+        <div class="panel" id="experimentalBtn">🧪 Calculator</div>
+    </div>
+
+    <div id="helpPanel" overflow-y: auto;">
+        <h3>Circle Formulas</h3>
+        <ul>
+            <li>Diameter = 2 × Radius</li>
+            <li>Radius = Diameter ÷ 2</li>
+            <li>Circumference = 2 × π × r</li>
+            <li>Circumference = π × d</li>
+            <li>Area = π × r²</li>
+            <li>Use π = 3.14</li>
+        </ul>
+
+        <h3>Vocab</h3>
+        <ul>
+            <li>Area: the space inside a circle</li>
+            <li>Circumference: the distance around a circle</li>
+            <li>Radius: the distance from the center to the edge</li>
+            <li>Diameter: the distance across the circle through the center</li>
+            <li>Center: the middle of the circle</li>
+        </ul>
+
+         <h3>How to Calculate Circles</h3>
+         <ul>
+            <li><strong>Find Area:</strong> Multiply Pi (3.1415) by the radius squared.</li>
+            <li><strong>Find Circumference:</strong> Multiply the diameter by Pi.</li>
+            <li><strong>Find Radius:</strong> Divide the diameter by two, or measure from the center to the edge.</li>
+            <li><strong>Find Diameter:</strong> Multiply the radius by two, or measure straight across the center.</li>
+            <li><strong>Locate Center:</strong> Find the exact point that is equidistant from all edges.</li>
+        </ul>
+    </div>
+
+    <div id="message"></div>
+    <div id="earth"></div>
+
+    <div id="menuOverlay">
+        <div class="overlayBackdrop"></div>
+        <div id="menuCard" class="overlayEnter">
+            <h1 id="menuTitle">Circle Defense</h1>
+            <div id="menuSubtitle">
+                Protect Earth by answering circle questions fast.
+                Pick Classic or Timer Mode, then press Start.
+            </div>
+            <div class="menuEarthWrap">
+                <div class="menuEarth"></div>
+            </div>
+            <div class="menuButtons">
+                <button class="menuButton" id="startBtn">Start</button>
+                <button class="menuSmall" id="toggleMenuModeBtn">Mode: Classic</button>
+            </div>
+            <div class="modeLabel">Current mode: <span class="modePill" id="menuModeLabel">Classic</span></div>
+        </div>
+    </div>
+
+    <div id="gameOver">
+        <div class="overlayBackdrop"></div>
+        <div id="gameOverCard" class="overlayEnter">
+            <h1>Earth Has Fallen</h1>
+            <div>That round is over. Try again and beat your score.</div>
+            <div class="gameOverGlow"></div>
+            <div class="statGrid" id="stats"></div>
+            <div class="gameOverButtons">
+                <button class="restart" id="retryBtn">Play Again</button>
+                <button class="menuSmall" id="backToMenuBtn">Main Menu</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="experimentalScreen" style="
+display:none;
+position:absolute;
+inset:0;
+z-index:1000;
+background:rgba(0,0,0,.92);
+justify-content:center;
+align-items:center;
+">
+
+<div style="
+width:min(900px,95vw);
+background:#101b33;
+padding:25px;
+border-radius:20px;
+border:1px solid rgba(255,255,255,.15);
+display:grid;
+grid-template-columns:1fr 1fr;
+gap:20px;
+">
+
+<div>
+<h2>Circle Calculator</h2>
+
+<select id="calcType" style="width:100%;padding:10px;margin:10px 0;">
+<option value="radius">Find Radius</option>
+<option value="diameter">Find Diameter</option>
+<option value="circumference">Find Circumference</option>
+<option value="area">Find Area</option>
+</select>
+
+<input
+id="calcValue"
+type="number"
+placeholder="Enter known value"
+style="width:100%;padding:10px;margin-bottom:10px;"
+>
+
+<button id="solveCircle" class="menuButton">
+Solve
+</button>
+
+<h3 style="margin-top:20px;">
+Result:
+<span id="calcResult">---</span>
+</h3>
+
+<div id="formulaUsed" style="margin-top:10px;color:#9dd9ff;"></div>
+
+<button
+id="closeExperimental"
+class="menuSmall"
+style="margin-top:20px;"
+>
+Close
+</button>
+</div>
+
+<div>
+
+<svg
+id="circleDiagram"
+viewBox="0 0 400 400"
+style="width:100%;height:auto;"
+>
+
+<circle
+id="mainCircle"
+cx="200"
+cy="200"
+r="120"
+fill="rgba(30,120,255,.2)"
+stroke="#59c7ff"
+stroke-width="4"
+/>
+
+<line
+id="radiusLine"
+x1="200"
+y1="200"
+x2="320"
+y2="200"
+stroke="#00ff99"
+stroke-width="5"
+/>
+
+<line
+id="diameterLine"
+x1="80"
+y1="200"
+x2="320"
+y2="200"
+stroke="#ffcc00"
+stroke-width="5"
+style="display:none;"
+/>
+
+<circle
+id="circHighlight"
+cx="200"
+cy="200"
+r="120"
+fill="none"
+stroke="#ff6666"
+stroke-width="12"
+style="display:none;"
+/>
+
+<text
+x="200"
+y="30"
+text-anchor="middle"
+fill="white"
+font-size="20"
+id="diagramLabel"
+>
+Radius
+</text>
+
+</svg>
+
+</div>
+
+</div>
+</div>
+
+<script>
+const gameContainer = document.getElementById("gameContainer");
+const scoreEl = document.getElementById("score");
+const livesEl = document.getElementById("lives");
+const levelEl = document.getElementById("level");
+const comboEl = document.getElementById("combo");
+const timerEl = document.getElementById("timer");
+const timerPanel = document.getElementById("timerPanel");
+const modeDisplay = document.getElementById("modeDisplay");
+const menuModeLabel = document.getElementById("menuModeLabel");
+const toggleMenuModeBtn = document.getElementById("toggleMenuModeBtn");
+const menuOverlay = document.getElementById("menuOverlay");
+const menuCard = document.getElementById("menuCard");
+const gameOverOverlay = document.getElementById("gameOver");
+const gameOverCard = document.getElementById("gameOverCard");
+const startBtn = document.getElementById("startBtn");
+const retryBtn = document.getElementById("retryBtn");
+const backToMenuBtn = document.getElementById("backToMenuBtn");
+const earthEl = document.getElementById("earth");
+
+let score = 0;
+let lives = 3;
+let level = 1;
+let combo = 0;
+let destroyed = 0;
+
+let totalQuestions = 0;
+let correctAnswers = 0;
+let wrongAnswers = 0;
+let maxCombo = 0;
+
+let currentAsteroid = null;
+let asteroidId = 0;
+let gameState = "menu";
+let mode = "classic";
+let timerSeconds = 60;
+let timerInterval = null;
+let spawnLocked = false;
+let earthShakeTimeout = null;
+let messageTimeout = null;
+const earthY = window.innerHeight - 180;
+
+const VOCAB = [
+    { term: "radius", clue: "the distance from the center of a circle to the edge" },
+    { term: "diameter", clue: "the distance across a circle through the center" },
+    { term: "circumference", clue: "the distance around a circle" },
+    { term: "area", clue: "the space inside a circle" },
+    { term: "center", clue: "the middle point of a circle" }
+];
+
+const FORMULAS = [
+    "Diameter = 2 × Radius",
+    "Radius = Diameter ÷ 2",
+    "Circumference = 2 × π × r",
+    "Circumference = π × d",
+    "Area = π × r²"
+];
+
+function updateHUD(){
+    scoreEl.textContent = score;
+    livesEl.textContent = lives;
+    levelEl.textContent = level;
+    comboEl.textContent = Math.max(1, combo);
+    modeDisplay.textContent = mode === "timer" ? "Timer" : "Classic";
+    timerPanel.style.display = mode === "timer" ? "block" : "none";
+    if (mode === "timer") timerEl.textContent = timerSeconds;
+}
+
+function playTone(freq, duration, type = "sine"){
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.type = type;
+    osc.frequency.value = freq;
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    gain.gain.value = 0.09;
+    osc.start();
+    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + duration);
+    osc.stop(ctx.currentTime + duration);
+}
+
+function successSound(){ playTone(720, 0.16, "triangle"); }
+function warningSound(){ playTone(180, 0.45, "sawtooth"); }
+function impactSound(){ playTone(75, 0.75, "square"); }
+function menuSound(){ playTone(520, 0.1, "triangle"); }
+
+function rand(min, max){
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function shuffle(arr){
+    return arr.sort(() => Math.random() - 0.5);
+}
+
+function round2(n){
+    return +n.toFixed(2);
+}
+
+function keyify(v){
+    return String(v).trim().toLowerCase();
+}
+
+function buildQuestion(question, correct, distractors){
+    let answers = [correct, ...distractors];
+    answers = shuffle([...new Set(answers.map(a => typeof a === "number" ? round2(a) : a))]);
+
+    while (answers.length < 4) {
+        if (typeof correct === "number") {
+            answers.push(round2(correct + rand(1, 6)));
+        } else {
+            answers.push(`${correct} `);
+        }
+    }
+
+    return {
+        question,
+        correct,
+        answers: shuffle(answers.slice(0, 4))
+    };
+}
+
+function createQuestion(){
+    const type = rand(1, 12);
+    const radius = rand(3 + level, 10 + level * 2);
+    const diameter = radius * 2;
+    const circumference = round2(3.14 * diameter);
+    const area = round2(3.14 * radius * radius);
+
+    switch (type) {
+        case 1: {
+            const question = `A circle has radius ${radius}. What is its diameter?`;
+            return buildQuestion(question, diameter, [radius, diameter + 2, radius * 4]);
+        }
+
+        case 2: {
+            const question = `A circle has diameter ${diameter}. What is its radius?`;
+            return buildQuestion(question, radius, [diameter, radius + 2, radius * 2]);
+        }
+
+        case 3: {
+            const question = `A circle has radius ${radius}. What is its circumference? Use 3.14 for π.`;
+            return buildQuestion(question, circumference, [round2(3.14 * radius), round2(2 * 3.14 * radius * radius), diameter]);
+        }
+
+        case 4: {
+            const question = `A circle has diameter ${diameter}. What is its circumference? Use 3.14 for π.`;
+            return buildQuestion(question, circumference, [round2(3.14 * radius), round2(2 * 3.14 * radius), area]);
+        }
+
+        case 5: {
+            const question = `A circle has radius ${radius}. What is its area? Use 3.14 for π.`;
+            return buildQuestion(question, area, [round2(3.14 * diameter), round2(2 * 3.14 * radius), radius * radius]);
+        }
+
+        case 6: {
+            const c = round2(3.14 * rand(6, 18));
+            const d = round2(c / 3.14);
+            const question = `A circle has circumference ${c}. What is its diameter? Use 3.14 for π.`;
+            return buildQuestion(question, d, [round2(c / 2), round2(c / 4), round2(c / 6)]);
+        }
+
+        case 7: {
+            const r = rand(3, 10);
+            const a = round2(3.14 * r * r);
+            const question = `A circle has area ${a}. What is its radius? Use 3.14 for π.`;
+            return buildQuestion(question, r, [round2(Math.sqrt(a)), round2(a / 3.14), r + 2]);
+        }
+
+        case 8: {
+            const item = VOCAB[rand(0, VOCAB.length - 1)];
+            const question = `Which circle vocab word means ${item.clue}?`;
+            const distractors = shuffle(VOCAB.filter(v => v.term !== item.term).map(v => v.term)).slice(0, 3);
+            return buildQuestion(question, item.term, distractors);
+        }
+
+        case 9: {
+            const item = FORMULAS[rand(0, FORMULAS.length - 1)];
+            const question = `Which formula matches the circumference of the circle?`;
+            const distractors = shuffle(FORMULAS.filter(f => f !== item)).slice(0, 3);
+            return buildQuestion(question, item, distractors);
+        }
+
+        case 10: {
+            const question = `Which formula finds circumference when you know the radius?`;
+            return buildQuestion(question, "Circumference = 2 × π × r", ["Circumference = π × d", "Area = π × r²", "Radius = Diameter ÷ 2"]);
+        }
+
+        case 11: {
+            const question = `Which formula finds circumference when you know the diameter?`;
+            return buildQuestion(question, "Circumference = π × d", ["Circumference = 2 × π × r", "Area = π × r²", "Diameter = 2 × Radius"]);
+        }
+
+        case 12: {
+            const question = `Which formula finds the area of a circle?`;
+            return buildQuestion(question, "Area = π × r²", ["Circumference = 2 × π × r", "Circumference = π × d", "Radius = Diameter ÷ 2"]);
+        }
+    }
+}
+
+function createScatteredStars(){
+    const starsLayer = document.getElementById("stars");
+    starsLayer.innerHTML = "";
+
+    const starCount = 150;
+
+    for (let i = 0; i < starCount; i++) {
+        const star = document.createElement("div");
+        const size = Math.random() < 0.72 ? 1 : Math.random() * 2 + 1;
+        const x = Math.random() * 100;
+        const y = Math.random() * 100;
+        const twinkle = 0.7 + Math.random() * 2.3;
+
+        star.style.position = "absolute";
+        star.style.left = x + "%";
+        star.style.top = y + "%";
+        star.style.width = size + "px";
+        star.style.height = size + "px";
+        star.style.borderRadius = "50%";
+        star.style.background = "white";
+        star.style.opacity = (0.25 + Math.random() * 0.75).toFixed(2);
+        star.style.boxShadow = Math.random() > 0.82 ? "0 0 8px rgba(255,255,255,.9)" : "none";
+        star.style.animation = `twinkle ${twinkle}s ease-in-out infinite alternate`;
+        star.style.animationDelay = (-Math.random() * 3) + "s";
+
+        starsLayer.appendChild(star);
+    }
+}
+
+function setMenuModeLabel(){
+    const label = mode === "timer" ? "Timer" : "Classic";
+    menuModeLabel.textContent = label;
+    toggleMenuModeBtn.textContent = `Mode: ${label}`;
+}
+
+function startGame(){
+    menuSound();
+
+    menuCard.classList.add("fadeUp");
+
+    setTimeout(() => {
+        menuOverlay.style.display = "none";
+        document.getElementById("hud").classList.add("visible");
+        gameState = "playing";
+        updateHUD();
+        spawnAsteroid();
+        if (mode === "timer") startTimer();
+    }, 500);
+}
+
+function startTimer(){
+    stopTimer();
+    timerSeconds = 60;
+    timerEl.textContent = timerSeconds;
+    timerEl.classList.remove("timerDanger");
+
+    timerInterval = setInterval(() => {
+        if (gameState !== "playing") return;
+
+        timerSeconds--;
+        timerEl.textContent = timerSeconds;
+
+        if (timerSeconds <= 10) {
+            timerEl.classList.add("timerDanger");
+        }
+
+        if (timerSeconds <= 0) {
+            stopTimer();
+            gameOver("time");
+        }
+    }, 1000);
+}
+
+function stopTimer(){
+    if (timerInterval) {
+        clearInterval(timerInterval);
+        timerInterval = null;
+    }
+}
+
+function animateEarthHit(){
+    earthEl.classList.remove("earth-hit");
+    void earthEl.offsetWidth;
+    earthEl.classList.add("earth-hit");
+
+    if (earthShakeTimeout) clearTimeout(earthShakeTimeout);
+    earthShakeTimeout = setTimeout(() => {
+        earthEl.classList.remove("earth-hit");
+    }, 350);
+}
+
+function showMessage(text, danger = false){
+    const msg = document.getElementById("message");
+    msg.textContent = text;
+    msg.style.color = danger ? "#ff9b9b" : "#ff6a6a";
+    msg.classList.add("show");
+
+    if (messageTimeout) clearTimeout(messageTimeout);
+    messageTimeout = setTimeout(() => {
+        msg.classList.remove("show");
+    }, 1200);
+}
+
+function spawnAsteroid(){
+    if (gameState !== "playing" || currentAsteroid) return;
+    if (spawnLocked) return;
+
+    asteroidId++;
+    totalQuestions++;
+
+    const q = createQuestion();
+    const asteroid = document.createElement("div");
+    asteroid.className = "asteroid";
+    asteroid.style.left = (window.innerWidth / 2 - 230) + "px";
+    asteroid.style.top = "120px";
+    asteroid.dataset.correct = keyify(q.correct);
+    asteroid.dataset.falling = "false";
+    asteroid.dataset.phase = "idle";
+
+    asteroid.innerHTML = `
+        <div class="question">☄️ ${q.question}</div>
+        <div class="answers">
+            ${q.answers.map(a => `<button class="answerBtn">${a}</button>`).join("")}
+        </div>
+    `;
+
+    asteroid.querySelectorAll(".answerBtn").forEach(btn => {
+        btn.addEventListener("click", () => answerQuestion(asteroid, btn.textContent));
+    });
+
+    gameContainer.appendChild(asteroid);
+    currentAsteroid = asteroid;
+
+    asteroid.animate([
+        { opacity: 0, transform: "translateY(-18px) scale(.94)" },
+        { opacity: 1, transform: "translateY(0) scale(1)" }
+    ], {
+        duration: 260,
+        easing: "ease-out"
+    });
+}
+
+function answerQuestion(asteroid, answer){
+    if (gameState !== "playing") return;
+
+    const correct = asteroid.dataset.correct;
+    const chosen = keyify(answer);
+
+    if (chosen === correct) {
+        correctAnswers++;
+        combo++;
+        maxCombo = Math.max(maxCombo, combo);
+
+        let points = asteroid.dataset.falling === "true" ? 50 : 100;
+        points *= Math.max(1, combo);
+        score += points;
+
+        destroyAsteroid(asteroid);
+        destroyed++;
+
+        showMessage(combo > 1 ? `+${points}  COMBO x${combo}` : `+${points}`, false);
+
+        if (destroyed % 10 === 0) {
+            level++;
+            showMessage(`LEVEL ${level}!`, false);
+        }
+    } else {
+        wrongAnswers++;
+        combo = 0;
+
+        if (asteroid.dataset.falling === "false") {
+            asteroid.dataset.falling = "true";
+            asteroid.classList.add("warning");
+            warningSound();
+            launchAsteroidProjectile(asteroid);
+            startFalling(asteroid);
+            showMessage("Wrong answer!", true);
+        }
+    }
+
+    updateHUD();
+}
+
+function startFalling(asteroid){
+    let y = parseFloat(asteroid.style.top);
+    const speed = 1.45 + level * 0.42;
+    const wobble = rand(-4, 4);
+
+    asteroid.dataset.phase = "falling";
+
+    function fall(){
+        if (!document.body.contains(asteroid) || gameState !== "playing") return;
+
+        y += speed;
+        asteroid.style.top = y + "px";
+        asteroid.style.transform = `translateX(${Math.sin(y / 20) * wobble}px)`;
+
+        if (y >= earthY) {
+            impactSound();
+            animateEarthHit();
+
+            const rect = asteroid.getBoundingClientRect();
+            earthImpactExplosion(rect.left + rect.width / 2, earthY + 40);
+
+            lives--;
+            updateHUD();
+            showMessage("-1 HP!", true);
+            asteroid.remove();
+            currentAsteroid = null;
+
+            if (lives <= 0) {
+                gameOver("lives");
+                return;
+            }
+
+            setTimeout(() => {
+                if (gameState === "playing") spawnAsteroid();
+            }, 900);
+            return;
+        }
+
+        requestAnimationFrame(fall);
+    }
+
+    requestAnimationFrame(fall);
+}
+
+function destroyAsteroid(asteroid){
+    successSound();
+
+    const rect = asteroid.getBoundingClientRect();
+    createExplosion(rect.left + rect.width / 2, rect.top + rect.height / 2, "#ff9d00");
+
+    asteroid.animate([
+        { transform: "scale(1)", opacity: 1 },
+        { transform: "scale(.76)", opacity: 0 }
+    ], {
+        duration: 180,
+        easing: "ease-in"
+    });
+
+    setTimeout(() => {
+        if (asteroid.parentNode) asteroid.remove();
+        currentAsteroid = null;
+        if (gameState === "playing") setTimeout(spawnAsteroid, 380);
+    }, 120);
+}
+
+function gameOver(reason = "lives"){
+    gameState = "gameover";
+    stopTimer();
+    document.getElementById("gameOver").style.display = "flex";
+    gameOverCard.classList.remove("overlayEnter");
+    void gameOverCard.offsetWidth;
+    gameOverCard.classList.add("overlayEnter");
+
+    const accuracy = totalQuestions
+        ? Math.round((correctAnswers / totalQuestions) * 100)
+        : 0;
+
+    const reasonText = reason === "time" ? "Time ran out" : "Earth took too many hits";
+
+    document.getElementById("stats").innerHTML = `
+        <div class="stat"><b>Result</b><span>${reasonText}</span></div>
+        <div class="stat"><b>Final Score</b><span>${score}</span></div>
+        <div class="stat"><b>Level Reached</b><span>${level}</span></div>
+        <div class="stat"><b>Asteroids Destroyed</b><span>${destroyed}</span></div>
+        <div class="stat"><b>Accuracy</b><span>${accuracy}%</span></div>
+        <div class="stat"><b>Best Combo</b><span>x${maxCombo}</span></div>
+    `;
+
+    showMessage("Game Over", true);
+}
+
+function cleanupAsteroids(){
+    document.querySelectorAll(".asteroid").forEach(a => a.remove());
+    currentAsteroid = null;
+}
+
+function resetGameState(){
+    score = 0;
+    lives = 3;
+    level = 1;
+    combo = 0;
+    destroyed = 0;
+    totalQuestions = 0;
+    correctAnswers = 0;
+    wrongAnswers = 0;
+    maxCombo = 0;
+    timerSeconds = 60;
+    cleanupAsteroids();
+    updateHUD();
+}
+
+function restartGame(){
+    menuOverlay.style.display = "none";
+    document.getElementById("gameOver").style.display = "none";
+    document.getElementById("hud").classList.add("visible");
+    resetGameState();
+    gameState = "playing";
+    if (mode === "timer") startTimer();
+    spawnAsteroid();
+}
+
+function returnToMenu(){
+    stopTimer();
+    cleanupAsteroids();
+    resetGameState();
+    gameState = "menu";
+    document.getElementById("gameOver").style.display = "none";
+    document.getElementById("hud").classList.remove("visible");
+    menuOverlay.style.display = "flex";
+    menuCard.classList.remove("fadeUp");
+    void menuCard.offsetWidth;
+    menuCard.classList.add("overlayEnter");
+}
+
+function createExplosion(x, y, color = "#ffb347"){
+    const particleCount = 28;
+
+    for (let i = 0; i < particleCount; i++) {
+        const particle = document.createElement("div");
+        const size = 5 + Math.random() * 5;
+        particle.className = "explosionParticle";
+        particle.style.left = x + "px";
+        particle.style.top = y + "px";
+        particle.style.width = size + "px";
+        particle.style.height = size + "px";
+        particle.style.background = color;
+        particle.style.boxShadow = `0 0 10px ${color}`;
+        particle.style.opacity = "1";
+
+        gameContainer.appendChild(particle);
+
+        const angle = Math.random() * Math.PI * 2;
+        const distance = 70 + Math.random() * 100;
+        const dx = Math.cos(angle) * distance;
+        const dy = Math.sin(angle) * distance;
+
+        particle.animate([
+            { transform: "translate(0,0) scale(1)", opacity: 1 },
+            { transform: `translate(${dx}px, ${dy}px) scale(0)`, opacity: 0 }
+        ], {
+            duration: 720,
+            easing: "cubic-bezier(.2,.8,.2,1)"
+        });
+
+        setTimeout(() => particle.remove(), 720);
+    }
+}
+
+function earthImpactExplosion(x, y){
+    const debrisCount = 60;
+
+    const fireball = document.createElement("div");
+    fireball.style.position = "absolute";
+    fireball.style.left = x + "px";
+    fireball.style.top = y + "px";
+    fireball.style.width = "30px";
+    fireball.style.height = "30px";
+    fireball.style.borderRadius = "50%";
+    fireball.style.background = "radial-gradient(circle, #fff6a0, #ff6a00, #b30000)";
+    fireball.style.boxShadow = "0 0 40px #ff6a00, 0 0 80px #ff0000";
+    fireball.style.transform = "translate(-50%, -50%) scale(.6)";
+    fireball.style.zIndex = 9999;
+
+    gameContainer.appendChild(fireball);
+
+    fireball.animate([
+        { transform: "translate(-50%, -50%) scale(.6)", opacity: 1 },
+        { transform: "translate(-50%, -50%) scale(3.2)", opacity: 0 }
+    ], {
+        duration: 700,
+        easing: "ease-out"
+    });
+
+    setTimeout(() => fireball.remove(), 700);
+
+    for (let i = 0; i < debrisCount; i++) {
+        const piece = document.createElement("div");
+        const size = Math.random() * 6 + 2;
+
+        piece.style.position = "absolute";
+        piece.style.left = x + "px";
+        piece.style.top = y + "px";
+        piece.style.width = size + "px";
+        piece.style.height = size + "px";
+        piece.style.background = Math.random() > 0.5 ? "#ffb347" : "#8b0000";
+        piece.style.borderRadius = "2px";
+        piece.style.zIndex = 9999;
+        piece.style.pointerEvents = "none";
+
+        gameContainer.appendChild(piece);
+
+        const angle = Math.random() * Math.PI * 2;
+        const force = 80 + Math.random() * 180;
+        const dx = Math.cos(angle) * force;
+        const dy = Math.sin(angle) * force + 40;
+
+        piece.animate([
+            { transform: "translate(0,0) rotate(0deg) scale(1)", opacity: 1 },
+            { transform: `translate(${dx}px, ${dy}px) rotate(${Math.random() * 720}deg) scale(.2)`, opacity: 0 }
+        ], {
+            duration: 900 + Math.random() * 400,
+            easing: "cubic-bezier(.2,.7,.2,1)"
+        });
+
+        setTimeout(() => piece.remove(), 1200);
+    }
+}
+
+function launchAsteroidProjectile(fromEl){
+    const rect = fromEl.getBoundingClientRect();
+    const startX = rect.left + rect.width / 2;
+    const startY = rect.top + rect.height / 2;
+
+    const earth = document.getElementById("earth");
+    const earthRect = earth.getBoundingClientRect();
+    const targetX = earthRect.left + earthRect.width / 2;
+    const targetY = earthRect.top + earthRect.height / 2;
+
+    const asteroid = document.createElement("div");
+    asteroid.style.position = "absolute";
+    asteroid.style.left = startX + "px";
+    asteroid.style.top = startY + "px";
+    asteroid.style.width = "22px";
+    asteroid.style.height = "22px";
+    asteroid.style.borderRadius = "50%";
+    asteroid.style.background = "radial-gradient(circle at 30% 30%, #7a4a1e, #3b2412)";
+    asteroid.style.boxShadow = "0 0 10px rgba(0,0,0,0.6)";
+    asteroid.style.zIndex = 9999;
+    asteroid.style.pointerEvents = "none";
+
+    gameContainer.appendChild(asteroid);
+
+    const dx = targetX - startX;
+    const dy = targetY - startY;
+    const arc = -160;
+
+    asteroid.animate([
+        { transform: "translate(0,0) scale(.9) rotate(0deg)", offset: 0 },
+        { transform: `translate(${dx * 0.45}px, ${dy * 0.2 + arc}px) scale(1.15) rotate(160deg)`, offset: 0.45 },
+        { transform: `translate(${dx}px, ${dy}px) scale(1.5) rotate(340deg)`, offset: 1 }
+    ], {
+        duration: 760,
+        easing: "cubic-bezier(.18,.82,.22,1)"
+    });
+
+    setTimeout(() => {
+        asteroid.remove();
+        earthImpactExplosion(targetX, targetY);
+    }, 760);
+}
+
+function toggleMode(){
+    mode = mode === "classic" ? "timer" : "classic";
+    setMenuModeLabel();
+    updateHUD();
+}
+
+function setupMenu(){
+    menuOverlay.style.display = "flex";
+    gameOverOverlay.style.display = "none";
+    document.getElementById("hud").classList.remove("visible");
+    setMenuModeLabel();
+}
+
+function resizeHandler(){
+    window.locationReloadSafeEarthY = window.innerHeight - 180;
+}
+
+function onStartFromMenu(){
+    setupMenu();
+    startGame();
+}
+
+document.getElementById("helpBtn").onclick = () => {
+    const panel = document.getElementById("helpPanel");
+    panel.style.display = panel.style.display === "block" ? "none" : "block";
+};
+
+document.getElementById("experimentalBtn").onclick = () => {
+    experimentalScreen.style.display = "flex";
+};
+
+toggleMenuModeBtn.onclick = () => {
+    toggleMode();
+    menuCard.classList.remove("overlayEnter");
+    void menuCard.offsetWidth;
+    menuCard.classList.add("overlayEnter");
+};
+
+startBtn.onclick = () => {
+    document.getElementById("helpPanel").style.display = "none";
+    menuCard.classList.remove("overlayEnter");
+    menuCard.classList.add("fadeUp");
+    setTimeout(onStartFromMenu, 500);
+};
+
+retryBtn.onclick = () => {
+    document.getElementById("gameOver").style.display = "none";
+    restartGame();
+};
+
+backToMenuBtn.onclick = () => {
+    returnToMenu();
+};
+
+const experimentalBtn =
+document.getElementById("experimentalBtn");
+
+const experimentalScreen =
+document.getElementById("experimentalScreen");
+
+experimentalBtn.onclick = () => {
+    experimentalScreen.style.display = "flex";
+};
+
+document.getElementById(
+    "closeExperimental"
+).onclick = () => {
+    experimentalScreen.style.display = "none";
+};
+
+document.getElementById(
+    "solveCircle"
+).onclick = () => {
+
+    const type =
+        document.getElementById("calcType").value;
+
+    const value =
+        parseFloat(
+            document.getElementById("calcValue").value
+        );
+
+    if (!value) return;
+
+    let result = "";
+    let formula = "";
+
+    const radiusLine =
+        document.getElementById("radiusLine");
+
+    const diameterLine =
+        document.getElementById("diameterLine");
+
+    const circHighlight =
+        document.getElementById("circHighlight");
+
+    const mainCircle =
+        document.getElementById("mainCircle");
+
+    const label =
+        document.getElementById("diagramLabel");
+
+    radiusLine.style.display = "none";
+    diameterLine.style.display = "none";
+    circHighlight.style.display = "none";
+
+    if (type === "radius") {
+
+        result = value / 2;
+        formula = "Radius = Diameter ÷ 2";
+
+        radiusLine.style.display = "block";
+        label.textContent = "Radius";
+
+    }
+
+    if (type === "diameter") {
+
+        result = value * 2;
+        formula = "Diameter = Radius × 2";
+
+        diameterLine.style.display = "block";
+        label.textContent = "Diameter";
+
+    }
+
+    if (type === "circumference") {
+
+        result = (2 * 3.14 * value).toFixed(2);
+        formula = "Circumference = 2 × π × r";
+
+        circHighlight.style.display = "block";
+        label.textContent = "Circumference";
+
+    }
+
+    if (type === "area") {
+
+        result = (3.14 * value * value).toFixed(2);
+        formula = "Area = π × r²";
+
+        mainCircle.setAttribute(
+            "fill",
+            "rgba(0,255,120,.35)"
+        );
+
+        label.textContent = "Area";
+
+    } else {
+
+        mainCircle.setAttribute(
+            "fill",
+            "rgba(30,120,255,.2)"
+        );
+    }
+
+    document.getElementById(
+        "calcResult"
+    ).textContent = result;
+
+    document.getElementById(
+        "formulaUsed"
+    ).textContent = formula;
+};
+
+createScatteredStars();
+updateHUD();
+setupMenu();
+spawnAsteroid();
+window.addEventListener("resize", updateHUD);
+</script>
+</body>
+</html>
+
+
+
+
+
+
